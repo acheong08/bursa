@@ -1,0 +1,73 @@
+body {
+	margin-top: 0.1rem;
+	margin-left: 0.1rem;
+}
+
+main {
+	display: flex;
+	height: 95vh;
+	width: 95vw;
+	justify-content: space-between;
+}
+
+.flex {
+	display: flex;
+	justify-content: space-between;
+}
+
+.notifications {
+	flex: 3 1 0;
+	max-width: 75%;
+}
+
+.alerts {
+	flex: 1 1 0;
+	padding-left: 10rem;
+	max-width: 25%;
+}
+
+.section {
+	border: black;
+	border-style: solid;
+	border-width: 1px;
+	padding: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	/* or any specific height */
+	overflow: hidden;
+}
+
+.vhscroll {
+	overflow: auto;
+	flex: 1;
+	min-height: 0;
+	width: 100%;
+	max-height: calc(100vh - 100px)
+}
+
+table {
+	font-family: arial, sans-serif;
+	border-collapse: collapse;
+	width: 100%;
+}
+
+thead {
+	position: sticky;
+	top: 0;
+	background-color: white;
+	/* Adjust as needed */
+	z-index: 1;
+}
+
+td,
+th {
+	border: 1px solid #dddddd;
+	text-align: left;
+	padding: 8px;
+	text-wrap: nowrap;
+}
+
+tr:nth-child(even) {
+	background-color: #dddddd;
+}

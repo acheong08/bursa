@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Bursa Alerts</title>
+    <link rel="stylesheet" href="main.css" />
+    <script src="alerts_editor.js"></script>
+    <script>
+      /**
+       * Represents stock entry data as received from the backend.
+       * @typedef {Object} StockEntryData
+       * @property {number} last_price - The last recorded price of the stock.
+       * @property {number} preclose_price - The previous closing price of the stock.
+       * @property {number} price_change - The change in price (current - previous).
+       * @property {number} total_bought_quantity - The total quantity of stock bought.
+       * @property {number} trade_value - The total value of trades.
+       * @property {number} buy_value - The total value of buy orders.
+       * @property {number} buy_volume - The volume of buy orders.
+       * @property {number} sell_volume - The volume of sell orders.
+       * @property {number} buy_rate - The rate of buy orders.
+       */
+
+      /**
+       * The full data for each websocket response
+       * @typedef {Object} StockEntryMap
+       * @property {string} alert - The alert message.
+       * @property {string} ticker - The stock ticker.
+       * @property {StockEntryData} data - The stock entry data.
+       */
+
+      /**
+       * Adds a notification to the notifications table.
+       * @param {StockEntryMap} stock - The stock entry data.
+       */
+      function addNotification(stock) {
+        const entries = document.getElementById("entries");
+        const row = document.createElement("tr");
+        row.innerHTML = `
+				<td>${stock.alert}</td>
+				<td>${stock.ticker}</td>
+				<td>${stock.data.last_price}</td>
+				<td>${stock.data.preclose_price}</td>
+				<td>${stock.data.price_change}</td>
+				<td>${stock.data.total_bought_quantity}</td>
+				<td>${stock.data.trade_value}</td>
+				<td>${stock.data.buy_volume}</td>
+				<td>${stock.data.buy_value}</td>
+				<td>${stock.data.sell_volume}</td>
+				<td>${stock.data.buy_rate}</td>
+			`;
+        entries.appendChild(row);
+      }
+
+      function dataStream() {
+        /**
+         * WebSocket connection to the backend.
+         * @type {WebSocket}
+         */
+        const ws = new WebSocket(
+          `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws`,
+        );
+
+        // Event listeners
+        ws.onopen = () => console.log("Connected");
+        ws.onmessage = (event) => {
+          let data = event.data;
+          if (typeof data === "string") {
+            data = JSON.parse(data);
+          }
+          console.log("Received:", data);
+          if (data.action === "ping") {
+            ws.send(JSON.stringify({ action: "pong" }));
+            return;
+          }
+          addNotification(data);
+        };
+        ws.onerror = (error) => console.error("WebSocket error:", error);
+        ws.onclose = () => {
+          console.log("Disconnected. Retrying in 3 seconds");
+          setTimeout(dataStream, 3000);
+        };
+      }
+    </script>
+  </head>
+
+  <body onload="dataStream()">
+    <main>
+      <div class="notifications section">
+        <h2>Notifications</h2>
+        <div class="vhscroll">
+          <table>
+            <tr>
+              <th>Alert</th>
+              <th>Stock</th>
+              <th>Last Price</th>
+              <th>Preclose Price</th>
+              <th>Price Change</th>
+              <th>Total bought quantity</th>
+              <th>Trade value</th>
+              <th>Buy Volume</th>
+              <th>Buy Value</th>
+              <th>Sell volume</th>
+              <th>Buy rate</th>
+            </tr>
+            <tbody id="entries"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="alerts section">
+        <alerts-editor></alerts-editor>
+      </div>
+    </main>
+  </body>
+</html>
