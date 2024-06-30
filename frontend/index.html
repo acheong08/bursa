@@ -28,26 +28,44 @@
        */
 
       /**
-       * Adds a notification to the notifications table.
+       * @type {Object.<string, StockEntryMap>}
+       */
+      const notifications = {};
+
+      /**
        * @param {StockEntryMap} stock - The stock entry data.
        */
-      function addNotification(stock) {
+      function updateEntry(stock) {
+        notifications[stock.ticker] = stock;
+      }
+
+      function refreshEntries() {
         const entries = document.getElementById("entries");
+        entries.innerHTML = "";
+        for (const stock of Object.values(notifications)) {
+          entries.appendChild(newEntryElement(stock));
+        }
+      }
+
+      /**
+       * @param {StockEntryMap} stock - The stock entry data.
+       */
+      function newEntryElement(stock) {
         const row = document.createElement("tr");
         row.innerHTML = `
-				<td>${stock.alert}</td>
-				<td>${stock.ticker}</td>
-				<td>${stock.data.last_price}</td>
-				<td>${stock.data.preclose_price}</td>
-				<td>${stock.data.price_change}</td>
-				<td>${stock.data.total_bought_quantity}</td>
-				<td>${stock.data.trade_value}</td>
-				<td>${stock.data.buy_volume}</td>
-				<td>${stock.data.buy_value}</td>
-				<td>${stock.data.sell_volume}</td>
-				<td>${stock.data.buy_rate}</td>
-			`;
-        entries.appendChild(row);
+      	<td>${stock.alert}</td>
+      	<td>${stock.ticker}</td>
+      	<td>${stock.data.last_price}</td>
+      	<td>${stock.data.preclose_price}</td>
+      	<td>${stock.data.price_change}</td>
+      	<td>${stock.data.total_bought_quantity}</td>
+      	<td>${stock.data.trade_value}</td>
+      	<td>${stock.data.buy_volume}</td>
+      	<td>${stock.data.buy_value}</td>
+      	<td>${stock.data.sell_volume}</td>
+      	<td>${stock.data.buy_rate}</td>
+      `;
+        return row;
       }
 
       function dataStream() {
@@ -71,7 +89,8 @@
             ws.send(JSON.stringify({ action: "pong" }));
             return;
           }
-          addNotification(data);
+          updateEntry(data);
+          refreshEntries();
         };
         ws.onerror = (error) => console.error("WebSocket error:", error);
         ws.onclose = () => {
