@@ -22,13 +22,15 @@
       /**
        * The full data for each websocket response
        * @typedef {Object} StockEntryMap
+       * @property {number} id - The unique identifier for the stock.
        * @property {string} alert - The alert message.
        * @property {string} ticker - The stock ticker.
+       * @property {string} name - The name of the stock
        * @property {StockEntryData} data - The stock entry data.
        */
 
       /**
-       * @type {Object.<string, StockEntryMap>}
+       * @type {Object.<number, StockEntryMap>}
        */
       const notifications = {};
 
@@ -36,16 +38,16 @@
        * @param {StockEntryMap} stock - The stock entry data.
        */
       function updateEntry(stock) {
-        notifications[stock.ticker] = stock;
+        notifications[stock.id] = stock;
       }
 
-      function refreshEntries() {
-        const entries = document.getElementById("entries");
-        entries.innerHTML = "";
-        for (const stock of Object.values(notifications)) {
-          entries.appendChild(newEntryElement(stock));
-        }
-      }
+      // function refreshEntries() {
+      //   const entries = document.getElementById("entries");
+      //   entries.innerHTML = "";
+      //   for (const stock of Object.values(notifications)) {
+      //     entries.appendChild(newEntryElement(stock));
+      //   }
+      // }
 
       /**
        * @param {StockEntryMap} stock - The stock entry data.
@@ -53,8 +55,9 @@
       function newEntryElement(stock) {
         const row = document.createElement("tr");
         row.innerHTML = `
-      	<td>${stock.alert}</td>
+	<td>${stock.alert}</td>
       	<td>${stock.ticker}</td>
+	<td><div style="overflow: scroll;"><span style="white-space:nowrap">${stock.name}</span></div></td>
       	<td>${stock.data.last_price}</td>
       	<td>${stock.data.preclose_price}</td>
       	<td>${stock.data.price_change}</td>
@@ -65,6 +68,8 @@
       	<td>${stock.data.sell_volume}</td>
       	<td>${stock.data.buy_rate}</td>
       `;
+        row.id = `entry-${stock.id}`;
+
         return row;
       }
 
@@ -89,8 +94,13 @@
             ws.send(JSON.stringify({ action: "pong" }));
             return;
           }
-          updateEntry(data);
-          refreshEntries();
+          const existingElement = document.getElementById(`entry-${data.id}`);
+          if (existingElement) {
+            // Remove from table
+            existingElement.remove();
+          }
+          // Add entry to top of table
+          document.getElementById("entries").prepend(newEntryElement(data));
         };
         ws.onerror = (error) => console.error("WebSocket error:", error);
         ws.onclose = () => {
@@ -107,13 +117,14 @@
         <h2>Notifications</h2>
         <div class="vhscroll">
           <table>
-            <tr>
+            <tr class="sticky">
               <th>Alert</th>
               <th>Stock</th>
-              <th>Last Price</th>
-              <th>Preclose Price</th>
-              <th>Price Change</th>
-              <th>Total bought quantity</th>
+              <th>Name</th>
+              <th>Last P</th>
+              <th>Preclose P</th>
+              <th>P Change</th>
+              <th>Total Bought Q</th>
               <th>Trade value</th>
               <th>Buy Volume</th>
               <th>Buy Value</th>

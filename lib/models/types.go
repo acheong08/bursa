@@ -2,8 +2,6 @@ package models
 
 import (
 	"bursa-alert/internal"
-	"bursa-alert/lib/utils"
-	"sync"
 )
 
 type StockEntry struct {
@@ -83,30 +81,3 @@ type StockMetadata struct {
 	Id     int
 }
 
-type stockMap struct {
-	m map[uint]*StockEntry
-	l sync.Mutex
-}
-
-func NewStockMap() stockMap {
-	return stockMap{
-		m: make(map[uint]*StockEntry),
-		l: sync.Mutex{},
-	}
-}
-
-func (s *stockMap) Update(e StockEntry) *StockEntry {
-	s.l.Lock()
-	defer s.l.Unlock()
-	if _, ok := s.m[e.internal.StockIndex]; !ok {
-		s.m[e.internal.StockIndex] = &e
-		return &e
-	}
-	tmpPointer := s.m[e.internal.StockIndex]
-	if tmpPointer == nil {
-		s.m[e.internal.StockIndex] = &e
-		return &e
-	}
-	utils.CopyNonDefaultValues(&e.internal, &tmpPointer.internal)
-	return tmpPointer
-}

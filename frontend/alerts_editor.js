@@ -104,7 +104,7 @@ class AlertsEditor extends HTMLElement {
         <input type="text" id="label" name="label" value="${alert ? alert.label : ""}" required>
         
         <label for="tags">Tags (comma-separated):</label>
-        <input type="text" id="tags" name="tags" value="${alert ? alert.tags.join(",") : ""}">
+        <input type="text" id="tags" name="tags" value="${alert ? (alert.tags ? alert.tags.join(",") : "") : ""}">
         
         <h3>Rules:</h3>
         <div id="rules-container">
@@ -143,6 +143,7 @@ class AlertsEditor extends HTMLElement {
   }
 
   renderRules(rules) {
+    if (!rules) return "";
     return rules
       .map(
         (rule, index) => `
@@ -241,7 +242,7 @@ class AlertsEditor extends HTMLElement {
     });
 
     // Here you would typically send this data to your server
-    const resp = await fetch("/alerts/", {
+    const resp = await fetch("/alerts/" + (index ? "?id=" + index : ""), {
       method: index === undefined ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(newAlert),
@@ -250,8 +251,9 @@ class AlertsEditor extends HTMLElement {
       alert(await resp.text());
       return;
     }
-
-    this.alerts.push(newAlert);
+    if (index === undefined) {
+      this.alerts.push(newAlert);
+    }
 
     // Close the dialog and update the view
     this.shadowRoot.querySelector("#alert-dialog").close();
@@ -259,7 +261,7 @@ class AlertsEditor extends HTMLElement {
   }
 
   async deleteAlert(index) {
-    const resp = await fetch(`/alerts/?label=${this.alerts[index].label}`, {
+    const resp = await fetch(`/alerts/?id=${index}`, {
       method: "DELETE",
     });
     if (resp.status !== 200) {
@@ -279,7 +281,7 @@ class AlertsEditor extends HTMLElement {
 			<div class="alert">
 				<h4>${alert.label}</h4>
 				<div class="tags">
-					${alert.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}
+					${alert.tags ? alert.tags.map((tag) => `<span class="tag">${tag}</span>`).join("") : ""}
 				</div>
 				<button type="button" class="edit-alert" data-index="${index}">Edit</button>
 				<button type="button" class="delete-alert" data-index="${index}">Delete</button>

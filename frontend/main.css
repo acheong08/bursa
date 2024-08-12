@@ -10,6 +10,18 @@ main {
 	justify-content: space-between;
 }
 
+td {
+	max-width: 5rem;
+	overflow: hidden;
+}
+
+.sticky {
+	position: sticky;
+	top: 0;
+	background-color: white;
+	z-index: 1;
+}
+
 .flex {
 	display: flex;
 	justify-content: space-between;

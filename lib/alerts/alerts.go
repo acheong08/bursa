@@ -1,9 +1,11 @@
 package alerts
 
 import (
+	"bursa-alert/lib/global"
 	"bursa-alert/lib/models"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 type Alert struct {
@@ -19,13 +21,20 @@ type Rule struct {
 }
 type eval struct {
 	Type  valueType `yaml:"type" json:"type"`
-	Value variable  `yaml:"value" json:"value"`
+	Var   variable  `yaml:"variable" json:"variable"`
+	Const float32   `yaml:"constant" json:"constant"`
+}
+
+type variable struct {
+	T        variableType  `yaml:"type" json:"type"`
+	// Oldest entry within x minutes
+	D uint `yaml:"duration" json:"duration"`
 }
 
 type (
-	variable   string
-	comparator string
-	valueType  string
+	variableType string
+	comparator   string
+	valueType    string
 )
 
 const (
@@ -43,14 +52,14 @@ const (
 )
 
 const (
-	VarLastPrice           variable = "last_price"
-	VarPreclosePrice       variable = "preclose_price"
-	VarPriceChange         variable = "price_change"
-	VarTotalBoughtQuantity variable = "total_bought_quantity"
-	VarTradeValue          variable = "trade_value"
-	VarBuyVolume           variable = "buy_volume"
-	VarSellVolume          variable = "sell_volume"
-	VarBuyRate             variable = "buy_rate"
+	VarLastPrice           variableType = "last_price"
+	VarPreclosePrice       variableType = "preclose_price"
+	VarPriceChange         variableType = "price_change"
+	VarTotalBoughtQuantity variableType = "total_bought_quantity"
+	VarTradeValue          variableType = "trade_value"
+	VarBuyVolume           variableType = "buy_volume"
+	VarSellVolume          variableType = "sell_volume"
+	VarBuyRate             variableType = "buy_rate"
 )
 
 func (a Alert) Validate() error {
@@ -62,6 +71,13 @@ func (a Alert) Validate() error {
 	return nil
 }
 
+func (e eval) String() string {
+	if e.Type == EvalConstant {
+		return fmt.Sprintf("%3f", e.Const)
+	}
+	return fmt.Sprintf("%s (%d min)", string(e.Var.T), e.Var.D)
+}
+
 func (e eval) validate() error {
 	switch e.Type {
 	default:
@@ -69,28 +85,42 @@ func (e eval) validate() error {
 	case EvalConstant, EvalVariable:
 	}
 	if e.Type == EvalVariable {
-		switch e.Value {
+		switch e.Var.T {
 		default:
-			return fmt.Errorf("%s is not a valid variable", e.Value)
+			return fmt.Errorf("%s is not a valid variable", e.Var.T)
 		case VarLastPrice, VarPreclosePrice, VarPriceChange, VarTotalBoughtQuantity, VarTradeValue, VarBuyVolume, VarSellVolume, VarBuyRate:
 		}
 	} else {
-		if _, err := strconv.ParseFloat(string(e.Value), 32); err != nil {
-			return fmt.Errorf("%s is not a float", e.Value)
+		if _, err := strconv.ParseFloat(string(e.Var.T), 32); err != nil {
+			return fmt.Errorf("%s is not a float", e.Var.T)
 		}
 	}
 	return nil
 }
 
-func (e *eval) float32(se models.StockEntry) float32 {
+func (e *eval) float32(id uint) float32 {
 	if e.Type == EvalConstant {
-		f, err := strconv.ParseFloat(string(e.Value), 32)
+		f, err := strconv.ParseFloat(string(e.Var.T), 32)
 		if err != nil {
 			panic(err)
 		}
 		return float32(f)
 	}
-	switch e.Value {
+	var se models.StockEntry
+	if e.Var.D == 0 {
+		if e := global.Entries.FetchOne(id); e != nil {
+			se = *e
+		} else {
+			return 0
+		}
+	} else {
+		if e := global.Entries.FetchOldestWithin(id, time.Duration(e.Var.D) * time.Minute); e != nil {
+			se = *e
+		} else {
+			return 0
+		}
+	}
+	switch e.Var.T {
 	case VarLastPrice:
 		return se.GetLastPrice()
 	case VarPreclosePrice:
@@ -127,9 +157,9 @@ func (r Rule) validate() error {
 	return nil
 }
 
-func (r *Rule) eval(se models.StockEntry) bool {
-	a := r.A.float32(se)
-	b := r.B.float32(se)
+func (r *Rule) eval(id uint) bool {
+	a := r.A.float32(id)
+	b := r.B.float32(id)
 	switch r.Cmp {
 	case CmpEquals:
 		return a == b
@@ -148,9 +178,9 @@ func (r *Rule) eval(se models.StockEntry) bool {
 	}
 }
 
-func (a Alert) Eval(se models.StockEntry) bool {
+func (a Alert) Eval(id uint) bool {
 	for _, rule := range a.Rules {
-		if !rule.eval(se) {
+		if !rule.eval(id) {
 			return false
 		}
 	}

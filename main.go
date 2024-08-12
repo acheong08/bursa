@@ -4,6 +4,7 @@ import (
 	"bursa-alert/internal/database"
 	"bursa-alert/lib"
 	"bursa-alert/lib/alerts"
+	"bursa-alert/lib/global"
 	"bursa-alert/lib/models"
 	"context"
 	"embed"
@@ -23,6 +24,11 @@ import (
 
 //go:embed frontend/*
 var frontend embed.FS
+
+var (
+	notificationsCache = make(map[uint]models.StockEntry)
+	stockMetadata      = make(map[uint]models.StockMetadata)
+)
 
 func main() {
 	wsMap := make(map[uint]*websocket.Conn)
@@ -71,13 +77,15 @@ func main() {
 		return c.JSON(200, alertList)
 	})
 	alertGroup.DELETE("/", func(c echo.Context) error {
-		label := c.QueryParam("label")
-		for i, alert := range alertList {
-			if alert.Label == label {
-				alertList = append(alertList[:i], alertList[i+1:]...)
-				return c.JSON(200, alertList)
-			}
+		index, err := strconv.Atoi(c.QueryParam("id"))
+		if err != nil {
+			return c.String(400, "Failed to parse index")
 		}
+
+		if len(alertList) < index {
+			return c.String(400, "Index out of range")
+		}
+		alertList = append(alertList[:index], alertList[index+1:]...)
 		return c.String(404, "Alert not found")
 	})
 	// Websocket for alerts
@@ -110,6 +118,16 @@ func main() {
 		wsMap[wsIndex] = ws
 		wsIndex++
 		defer delete(wsMap, wsIndex)
+
+		// Send notification cache
+		for _, entry := range notificationsCache {
+			_ = wsjson.Write(ctx, ws, map[string]any{
+				"id":     entry.GetIndex(),
+				"data":   entry.ToMap(),
+				"ticker": stockMetadata[entry.GetIndex()].Ticker,
+				"name":   stockMetadata[entry.GetIndex()].Name,
+			})
+		}
 
 		for {
 			// Wait for pong
@@ -144,7 +162,6 @@ func main() {
 }
 
 func stockings(alertList []alerts.Alert, wsMap map[uint]*websocket.Conn) {
-	stockMetadata := make(map[uint]models.StockMetadata)
 	// Create initial connection to fetch metadata
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := lib.GetStockMetadata(stockMetadata); err != nil {
@@ -181,18 +198,19 @@ func stockings(alertList []alerts.Alert, wsMap map[uint]*websocket.Conn) {
 	// if err != nil {
 	// 	panic(err)
 	// }
-	stockMap := models.NewStockMap()
-
 	for {
 		select {
 		case stock := <-stockCh:
-			mergedEntry := stockMap.Update(stock)
+			stock = global.Entries.Push(stock)
 			for _, alert := range alertList {
-				if alert.Eval(*mergedEntry) {
+				if alert.Eval(stock.GetIndex()) {
+					notificationsCache[stock.GetIndex()] = stock
 					for _, ws := range wsMap {
 						_ = wsjson.Write(ctx, ws, map[string]any{
-							"data":   mergedEntry.ToMap(),
-							"ticker": fmt.Sprintf("%s (%s)", stockMetadata[mergedEntry.GetIndex()].Name, stockMetadata[mergedEntry.GetIndex()].Ticker),
+							"id":     stock.GetIndex(),
+							"data":   stock.ToMap(),
+							"ticker": stockMetadata[stock.GetIndex()].Ticker,
+							"name":   stockMetadata[stock.GetIndex()].Name,
 							"alert":  alert.Label,
 						})
 					}
